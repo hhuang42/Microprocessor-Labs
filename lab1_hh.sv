@@ -56,7 +56,7 @@ module eight_seg_led_bar(input  logic       clk,
                          output logic [7:0] led);
   logic [31:0] count;
   always_ff @ (posedge clk) begin
-    if (count == 8_333_333) begin
+    if (count > 8_333_333) begin
       led[7] <= ~led[7];
       count <= 0;
     end else begin
