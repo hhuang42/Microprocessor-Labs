@@ -14,7 +14,7 @@ module lab2_hh (input  logic       clk,
                 output logic [4:0] sum);
   logic oscil;  
   logic [3:0] value;
-  exp_2_oscillator exp_19_oscil(clk, oscil);
+  exp_2_oscillator exp_oscil(clk, oscil);
   always_comb begin
     sum = left_value + right_value;
     value = oscil ? left_value : right_value;
@@ -24,6 +24,22 @@ module lab2_hh (input  logic       clk,
 endmodule
 
 /*
+ * exp_2_oscillator
+ * 
+ * Parameter: 
+ *   SLOWDOWN_EXP - the power of two that the output signal is slowed by
+ *
+ * Inputs:
+ *   clk - the base oscillating signal to base the output signal off of
+ *
+ * Output:
+ *   oscil - a signal that oscillates at a slower rate than clk based
+ *           on the SLOWDOWN_EXP.
+ *
+ *   The output signal will invert every 2^SLOWDOWN_EXP clk cycles. However,
+ * since the signal needs to be inverted twice for every cycle, the output
+ * signal will be 2^(SLOWDOWN_EXP+1) times slower than the original signal.
+ *   
  */
 module exp_2_oscillator #(parameter SLOWDOWN_EXP = 17)
                          (input  logic clk,
