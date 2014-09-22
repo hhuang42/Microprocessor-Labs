@@ -6,6 +6,25 @@
  */
 
 /*
+ * lab2_hh
+ * 
+ * Inputs:
+ *   clk - a 40 MHz clock signal
+ *   left_value - a 4-bit value to display on the left digit of the LED digit
+ *   right_value - a 4-bit value to display on the right digit of the LED digit
+ * 
+ * Output:
+ *   left_off - a signal indicating if the left digit should be powered off
+ *   right_off - a signal indicating if the right digit should be powered off
+ *   seven_seg_digit - the control signal for the currently powered 7 
+ *                     segment LED digit
+ *   sum - the sum of left_value and right_value
+ *
+ *   This module controls a time-multiplexed set of 2 digits by specifying when
+ * each of the two digits is to be turned off (while the other digit remains
+ * powered), and sending the appropriate signal for that digit to the 7 segment
+ * LED, based on the input values of the left_value and right_value signals.
+ * 
  */
 module lab2_hh (input  logic       clk,
                 input  logic [3:0] left_value, right_value,
