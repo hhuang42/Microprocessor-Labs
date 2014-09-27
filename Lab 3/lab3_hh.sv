@@ -19,33 +19,61 @@ module lab3_hh (input  logic       clk,
                 input  logic [3:0] col_values,
                 output logic [3:0] row_values,
                 output logic       left_off, right_off,
-                output logic [6:0] seven_seg_digit,
-                output logic [7:0] debug_led);
+                output logic [6:0] seven_seg_digit);
   logic [3:0] read_hex;
+  logic       read_signal;
+  logic       activate;
+  
+  
+  
+  hex_scanner scanner(clk, reset, col_values, row_values, read_signal, read_hex);
+  hex_debouncer debouncer(clk, reset, read_signal, read_hex, activate);
+  hex_writer writer(clk, reset, read_hex, activate, left_off, right_off, seven_seg_digit);
+  
+endmodule
+
+module hex_scanner (input  logic       clk,
+                    input  logic       reset,
+                    input  logic [3:0] col_values,
+                    output logic [3:0] row_values,
+                    output logic       read_signal,
+                    output logic [3:0] read_hex);
+  logic [3:0] raw_hex;
+  logic       raw_signal;
   logic [1:0] input_row;
   logic [1:0] output_col;
-  logic       read_signal;
-  logic       deactivate;
-  logic       key_trigger;
-  logic       tracking;
-  logic       tracked_signal;
-  logic [3:0] tracked_hex;
+  hex_generator generator(clk, reset, raw_hex, input_row, output_col);
+  key_reader reader(input_row, output_col, col_values, row_values, raw_signal);
+  key_synchronizer synchronizer(clk, reset, raw_signal, raw_hex, read_signal, read_hex);
+endmodule
+
+module hex_debouncer (input  logic       clk,
+                      input  logic       reset,
+                      input  logic       read_signal,
+                      input  logic [3:0] read_hex,
+                      output logic       activate);
+  logic deactivate;
+  logic tracking;
+  logic tracked_signal;
+  key_trigger trigger(tracking, read_signal, activate);
+  key_tracker tracker(clk, reset, read_signal, read_hex, deactivate,
+                        activate, tracking, tracked_signal);
+  key_deactivator deactivator(clk, reset, tracking, tracked_signal, deactivate);
+endmodule
+
+module hex_writer(input  logic       clk,
+                  input  logic       reset,
+                  input  logic [3:0] read_hex,
+                  input  logic       activate,
+                  output logic       left_off, right_off,
+                  output logic [6:0] seven_seg_digit);
   logic [3:0] left_hex;
   logic [3:0] right_hex;
-  
-  hex_generator generator(clk, reset, read_hex, input_row, output_col);
-  key_reader reader(input_row, output_col, col_values, row_values, read_signal);
-  key_tracker tracker(clk, reset, read_signal, read_hex, deactivate,
-                        key_trigger, tracking, tracked_signal, tracked_hex);
-  key_deactivator deactivator(clk, reset, tracking, tracked_signal, deactivate);
-  key_record record(clk, reset, tracked_hex, key_trigger, left_hex, right_hex);
+  key_record record(clk, reset, read_hex, activate, left_hex, right_hex);
   hex_display display(clk, left_hex, right_hex, left_off, right_off, seven_seg_digit);
-  assign debug_led[0] = tracked_signal;
-  assign debug_led[1] = read_signal;
-  assign debug_led[2] = tracking;
-  assign debug_led[3] = deactivate;
-  assign debug_led[7:4] = tracked_hex;
 endmodule
+                      
+                    
 
 module hex_generator (input  logic clk,
                       input  logic reset,
@@ -95,26 +123,49 @@ module key_reader (input  logic [1:0] input_row,
   end
 endmodule
 
+module key_synchronizer (input  logic       clk,
+                         input  logic       reset,
+                         input  logic       raw_signal,
+                         input  logic [3:0] raw_hex,
+                         output logic       read_signal,
+                         output logic [3:0] read_hex);
+  always_ff @ (posedge clk or posedge reset) begin
+    if (reset) begin
+      read_signal <= '0;
+      read_hex    <= '0;
+    end else begin
+      read_signal <= raw_signal;
+      read_hex    <= raw_hex;
+    end
+  end
+endmodule
+ 
+module key_trigger (input  logic tracking,
+                    input  logic read_signal,
+                    output logic activate);
+  always_comb begin
+    activate = read_signal & ~tracking;
+  end
+endmodule  
+ 
 module key_tracker (input  logic       clk,
-                     input  logic       reset,
-                     input  logic       read_signal,
-                     input  logic [3:0] read_hex,
-                     input  logic       deactivate,
-                     output logic       key_trigger,
-                     output logic       tracking,
-                     output logic       tracked_signal,
-                     output logic [3:0] tracked_hex);
+                    input  logic       reset,
+                    input  logic       read_signal,
+                    input  logic [3:0] read_hex,
+                    input  logic       deactivate,
+                    input  logic       activate,
+                    output logic       tracking,
+                    output logic       tracked_signal);
+  logic [3:0] tracked_hex;
   always_ff @ (posedge clk or posedge reset) begin
     if (reset) begin
       tracking         <= '0;
-      tracked_hex    <= 4'h8;
+      tracked_hex    <= 4'h0;
       tracked_signal <= '0;
-      key_trigger      <= '0;
     end else begin
-      tracking         <= deactivate ? '0 : read_signal ? '1 : tracking;
-      tracked_hex    <= tracking ? tracked_hex : read_hex;
+      tracking       <= deactivate ? '0 : activate ? '1 : tracking;
+      tracked_hex    <= activate ? read_hex : tracked_hex;
       tracked_signal <= (read_hex == tracked_hex) ? read_signal : '0;
-      key_trigger      <= read_signal & ~tracking;
     end
   end
 endmodule
@@ -129,10 +180,9 @@ module key_deactivator #(parameter COUNTDOWN_BITS = 20)
   always_ff @ (posedge clk or posedge reset) begin
     if (reset) begin
       inactivity_counter <= '0;
-    end else if (~tracking | tracked_signal) begin
-      inactivity_counter <= '0;
     end else begin
-      inactivity_counter <=  (inactivity_counter + 1);
+      inactivity_counter <= 
+          (tracking & ~tracked_signal) ? (inactivity_counter + 1) : '0;
     end
   end
   always_comb begin
@@ -143,14 +193,14 @@ endmodule
 module key_record (input  logic       clk,
                    input  logic       reset,
                    input  logic [3:0] new_hex,
-                   input  logic       key_trigger,
+                   input  logic       activate,
                    output logic [3:0] left_hex,
                    output logic [3:0] right_hex);
   always_ff @ (posedge clk or posedge reset) begin
     if (reset) begin
-      left_hex  <= 4'h8;
-      right_hex <= 4'h8;
-    end else if (key_trigger) begin
+      left_hex  <= 4'h4;
+      right_hex <= 4'h2;
+    end else if (activate) begin
       left_hex  <= right_hex;
       right_hex <= new_hex;
     end else begin
