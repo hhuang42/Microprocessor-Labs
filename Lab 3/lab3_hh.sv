@@ -28,7 +28,8 @@ module lab3_hh (input  logic       clk,
   
   hex_scanner scanner(clk, reset, col_values, row_values, read_signal, read_hex);
   hex_debouncer debouncer(clk, reset, read_signal, read_hex, activate);
-  hex_writer writer(clk, reset, read_hex, activate, left_off, right_off, seven_seg_digit);
+  hex_writer writer(clk, reset, read_hex, activate, 
+                    left_off, right_off, seven_seg_digit);
   
 endmodule
 
@@ -58,7 +59,7 @@ module hex_debouncer (input  logic       clk,
   key_trigger trigger(tracking, read_signal, activate);
   key_tracker tracker(clk, reset, read_signal, read_hex, deactivate,
                         activate, tracking, tracked_signal);
-  key_deactivator deactivator(clk, reset, tracking, tracked_signal, deactivate);
+  key_deactivator #(20) deactivator(clk, reset, tracking, tracked_signal, deactivate);
 endmodule
 
 module hex_writer(input  logic       clk,
@@ -118,7 +119,12 @@ module key_reader (input  logic [1:0] input_row,
                    output logic [3:0] row_values,
                    output logic       read_signal);
   always_comb begin
-    row_values = 4'b0001 << input_row;
+    case (input_row)
+		4'h0 : row_values = 4'bzzz1;
+		4'h1 : row_values = 4'bzz1z;
+		4'h2 : row_values = 4'bz1zz;
+		4'h3 : row_values = 4'b1zzz;
+    endcase
     read_signal = col_values[output_col];
   end
 endmodule
