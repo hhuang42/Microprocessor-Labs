@@ -9,8 +9,18 @@
  * lab3_hh
  * 
  * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ *   col_values - the signals read from all keypad columns
  * 
  * Output:
+ *   row_values - the signal to set on for all keypad rows
+ *   left_off - a signal indicating if the left digit should be powered off
+ *   right_off - a signal indicating if the right digit should be powered off
+ *   
+ *   This module detects the keypresses of a matrix keyboard connected to 
+ * the given row and column. It detects distinct keypresses on the keyboard, and
+ * outputs them to a time multiplexed dual digit LED component.
  * 
  */
  
@@ -24,14 +34,30 @@ module lab3_hh (input  logic       clk,
   logic       read_signal;
   logic       activate;
   
-  
-  
   hex_scanner scanner(clk, reset, col_values, row_values, read_signal, read_hex);
   hex_debouncer debouncer(clk, reset, read_signal, read_hex, activate);
   hex_writer writer(clk, reset, read_hex, activate, 
                     left_off, right_off, seven_seg_digit);
   
 endmodule
+
+/*
+ * hex_scanner
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ *   col_values - the signals read from all keypad columns
+ *   
+ * Output:
+ *   row_values - the signal to set on for all keypad rows
+ *   read_signal - the signal corresponding to the read_hex
+ *   read_hex - the value read from the keypad
+ *   
+ *   This module manipulates the column and row pins to read a new hex key
+ * every clock cycle, and outputs the read_hex, the signal for that key.
+ *  
+ */
 
 module hex_scanner (input  logic       clk,
                     input  logic       reset,
@@ -48,6 +74,25 @@ module hex_scanner (input  logic       clk,
   key_synchronizer synchronizer(clk, reset, raw_signal, raw_hex, read_signal, read_hex);
 endmodule
 
+/*
+ * hex_debouncer
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ *   read_signal - the signal corresponding to the read_hex
+ *   read_hex - the value read from the keypad
+ *   
+ * Output:
+ *   activate - a signal that the keypad value has just been pressed
+ *
+ *   This module takes in the value of the scanned key and the corresponding
+ * signal and decides when the signal is a new button press by setting the 
+ * output signal activate to high when the read_signal constitutes a unique
+ * button press for the key indicated by read_hex.
+ *  
+ */
+
 module hex_debouncer (input  logic       clk,
                       input  logic       reset,
                       input  logic       read_signal,
@@ -62,6 +107,25 @@ module hex_debouncer (input  logic       clk,
   key_deactivator #(20) deactivator(clk, reset, tracking, tracked_signal, deactivate);
 endmodule
 
+/*
+ * hex_writer
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ *   read_hex - the value read from the keypad
+ *   activate - a signal that the keypad value has just been pressed
+ * 
+ * Output:
+ *   left_off, right_off - the signals to indictate when the LEDs are off
+ *   seven_seg_digit - the decoded signals for the time-multiplexed LED digits
+ *
+ *   This module reads in hex values when the activate signal indicates
+ * that a new button has been pressed. It then displays the last two pressed
+ * values by LED control signals, with the most recent on the right LED.
+ *  
+ */
+
 module hex_writer(input  logic       clk,
                   input  logic       reset,
                   input  logic [3:0] read_hex,
@@ -74,7 +138,22 @@ module hex_writer(input  logic       clk,
   hex_display display(clk, left_hex, right_hex, left_off, right_off, seven_seg_digit);
 endmodule
                       
-                    
+/*
+ * hex_generator
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ * 
+ * Output:
+ *   hex_values - the value of the key to read next
+ *   input_row - the row of the key to read next
+ *   output_col - the column of the key to read next
+ *
+ *   This module scrolls through all 16 hex values, one per clock
+ * cycle, and outputs the row and column for the appropriate key.
+ *  
+ */
 
 module hex_generator (input  logic clk,
                       input  logic reset,
@@ -112,6 +191,28 @@ module hex_generator (input  logic clk,
   end
 endmodule
   
+/*
+ * key_reader
+ * 
+ * Inputs:
+ *   input_row - the row of the key to read
+ *   output_col - the column of the key to read
+ *   col_values - the signals read from all keypad columns
+ * 
+ * Output:
+ *   row_values - the signal to set on for all keypad rows
+ *   read_signal - the value of the key associated with the previous cycle
+ *
+ *   This module manipulates the column and row pins connected to the
+ * matrix keypad in order to find whether the key at the specified input_row
+ * and output_col is maintaining contact. The output of the key is shown in 
+ * read_signal.
+ *
+ *   This module requires that the pins for col_values have pulldown resistors
+ * that can bring the signal to a low within 1 clock cycle, since rows are
+ * powered to either high or high impedance.
+ *  
+ */
 
 module key_reader (input  logic [1:0] input_row,
                    input  logic [1:0] output_col,
@@ -129,6 +230,25 @@ module key_reader (input  logic [1:0] input_row,
   end
 endmodule
 
+/*
+ * key_synchronizer
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ *   raw_signal - a non-synchronized signal directly from the key pad
+ *   raw_hex - the value of the key that the raw_signal is associated with
+ * 
+ * Output:
+ *   read_signal - a delayed synchronized signal from the previous cycle
+ *   read_hex - the value of the key associated with the previous cycle
+ *
+ *   This module synchronizes the read_signal by forcing it to settle for
+ * a clock cycle before propagating through the rest of the system. The hex
+ * value is also delayed by a clock cycle to stay in sync with the signal.
+ *  
+ */
+
 module key_synchronizer (input  logic       clk,
                          input  logic       reset,
                          input  logic       raw_signal,
@@ -145,6 +265,23 @@ module key_synchronizer (input  logic       clk,
     end
   end
 endmodule
+
+/*
+ * key_trigger
+ * 
+ * Inputs:
+ *   tracking - a signal that a key press is currently being tracked
+ *   read_signal - a signal that the read key has contact
+ * 
+ * Output:
+ *   activate - a signal that tracking of the currently read key should start
+ *
+ *   This module triggers the activate output signal when an active signal is
+ * read from a key when no key is currently being tracked. This module is entirely
+ * combinatoric, so the output value refers to the key being read within the same
+ * clock cycle, rather than during the previous one.
+ *  
+ */
  
 module key_trigger (input  logic tracking,
                     input  logic read_signal,
@@ -153,6 +290,39 @@ module key_trigger (input  logic tracking,
     activate = read_signal & ~tracking;
   end
 endmodule  
+
+/*
+ * key_tracker
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ *   read_signal - a signal that the read key has contact
+ *   read_hex - a 4-bit value indicating the value of the read key
+ *   deactivate - a signal that the current tracking be deactivated
+ *   activate - a signal that the currently read key should be tracked
+ * 
+ * Output:
+ *   tracking - a signal that this module is currently tracking a key press
+ *   tracked_signal - a signal indicating whether the tracked key has contact
+ *
+ *   This module maintains the state of whether a key press is tracked or not.
+ * When it receives an activate signal in a clock cycle, it stores the hex 
+ * value of the currently read key, and outputs a high signal on the tracking
+ * output. It continues to maintain this tracking state until it receives a
+ * deactivate signal, at which point it again waits for an activate signal.
+ *
+ *   While the module is in an activated state, it checks if the read_hex
+ * matches the tracked_hex value, and if the respective signal from the
+ * key is active. If so, it sets the tracked_signal to be active.
+ * Otherwise, if the read key differs from the tracked key, or the tracked
+ * key's signal is not active, the module outputs a low value for the
+ * tracked_signal.
+ *
+ *   The tracked_signal's value is undefined when the module is not in its
+ * tracking state. 
+ *  
+ */
  
 module key_tracker (input  logic       clk,
                     input  logic       reset,
@@ -176,6 +346,41 @@ module key_tracker (input  logic       clk,
   end
 endmodule
 
+/*
+ * key_deactivator
+ *
+ * Parameter:
+ *   COUNTDOWN_BITS - the number of bits used to track the number of inactive
+ *                    clock cycles before a keypress is deactivated.
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state
+ *   tracking - a signal indicating that a key press is currently being tracked
+ *   tracked_signal - a signal indicating whether the tracked key has contact
+ * 
+ * Output:
+ *   deactivate - a signal indicating that the key press tracking should be
+ *                deactivated
+ *
+ *   This module is active when a tracking signal indicates that key press
+ * tracking is currently activated, and should be deactivated when there have
+ * been no signal from the relevant key for (2^COUNTDOWN_BITS - 1) cycles.
+ *
+ *   This module begins counting the number of consecutive cycles where no 
+ * key contact signal arrives. If (2^COUNTDOWN_BITS - 1) cycles of inactivity
+ * occur, this module signals that the key tracking should be deactivated.
+ *
+ *   Otherwise, if a key contact signal arrives before the countdown finishes,
+ * the timer resets, and the module will restart counting up to 
+ * (2^COUNTDOWN_BITS - 1) cycles.
+ *
+ *   Once the key tracking's deactivation is confirmed via the tracking signal,
+ * the module resets its countdown and ceases activity until key tracking is 
+ * reactivated.
+ *  
+ */
+
 module key_deactivator #(parameter COUNTDOWN_BITS = 20) 
                         (input  logic clk,
                          input  logic reset,
@@ -196,6 +401,29 @@ module key_deactivator #(parameter COUNTDOWN_BITS = 20)
   end
 endmodule
 
+/*
+ * hex_record
+ * 
+ * Inputs:
+ *   clk - a clock signal to synchronize the logic with
+ *   reset - a reset signal to clear the internal state of the record to 42
+ *   new_hex - a 4-bit value to store as input
+ *   activate - an enable signal allowing new_hex to be stored
+ * 
+ * Output:
+ *   left_hex - the second most recent hex value to be stored
+ *   right_hex - the most recent hex value to be stored
+ * 
+ *   This module stores the last two hex values assigned to new_hex
+ * when the activate enable signal is turned on. The most recent value
+ * is stored as the right hex, and the second most recent value is
+ * stored as the left hex. Note that the recorded hex values are updated
+ * for every clock cycle where the activate signal is enabled, such that
+ * in order to store a single new value, the activate signal must be high
+ * for only a single cycle.
+ *   
+ */
+
 module key_record (input  logic       clk,
                    input  logic       reset,
                    input  logic [3:0] new_hex,
@@ -215,6 +443,27 @@ module key_record (input  logic       clk,
     end
   end
 endmodule
+
+/*
+ * hex_display
+ * 
+ * Inputs:
+ *   clk - a 40 MHz clock signal
+ *   left_value - a 4-bit value to display on the left digit of the LED digit
+ *   right_value - a 4-bit value to display on the right digit of the LED digit
+ * 
+ * Output:
+ *   left_off - a signal indicating if the left digit should be powered off
+ *   right_off - a signal indicating if the right digit should be powered off
+ *   seven_seg_digit - the control signal for the currently powered 7 
+ *                     segment LED digit
+ * 
+ *   This module controls a time-multiplexed set of 2 digits by specifying when
+ * each of the two digits is to be turned off (while the other digit remains
+ * powered), and sending the appropriate signal for that digit to the 7 segment
+ * LED, based on the input values of the left_value and right_value signals.
+ *   
+ */
   
 module hex_display (input  logic       clk,
                     input  logic [3:0] left_value, right_value,
