@@ -1,5 +1,5 @@
-/*      leds.S
-        Written <date> by <your_name>@hmc.edu
+/*      leds_hh.S
+        Written 12/4/2014 by Henry_Huang@hmc.edu
         Test PIC by turning on LEDs        */
 
 #   #include <P32xxxx.h>
@@ -32,7 +32,6 @@ main:
       la    $t0,  TRISD             # Load the address of TRISD into $t0
       addi  $t1,  $0,   0xFF00
       sw    $t1,  0($t0)            # TRISD = 0xF00 (bottom 8 bits outputs)
-      addi  $t1,  $0,   LEDS        # $t1 = LEDS (LEDS + 0)
       
 
 # Initializes stack with 12 elements as defined in macros.
