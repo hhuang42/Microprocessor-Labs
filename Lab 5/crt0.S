@@ -14,6 +14,7 @@ _reset:
 	# Initialize stack and global pointers
 	#la		$sp, _stack
 	lui 	$sp, 0xa001
+
 	addiu	$sp, $sp, 0
 	la		$gp, _gp
 
