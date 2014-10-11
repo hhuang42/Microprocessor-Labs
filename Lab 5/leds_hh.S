@@ -10,7 +10,10 @@
 #define     T1SET       0xD030      # 1101_0000_0011_0000
 #define     T2SET       0xC020      # 1100_0000_0010_0000
 #define     NOTPORT     0xFFBF      # 1111_1111_1011_1111
-#define     PORTSLOT    0x0040      # 0000_0000_0100_0000        
+#define     PORTSLOT    0x0040      # 0000_0000_0100_0000
+#define     OP_MASK     0xF000
+#define     OP_STOP     0x0000
+#define     OP_REPEAT   0x1000        
         .global main
 
 #       Compiler instructions
@@ -37,16 +40,16 @@ main:
 
 # output config setup
 
-      la    $t0,  TRISG             # Load the address of TRISD into $t0
+      la    $t0,  TRISG             
       lwr   $t1,  0($t0)
       andi  $t1,  NOTPORT          
-      swr   $t1,  0($t0)            # TRISD = 0xF00 (bottom 8 bits outputs)
+      swr   $t1,  0($t0)            
 
       la    $t5,  PORTG
 
 # song data pointer setup
       
-      la   $t0,  _notes
+      la   $t0,  _tears
       lhu  $t3,  2($t0)
       lhu  $t4,  0($t0)
 
@@ -58,7 +61,7 @@ main:
       swr   $0,   0($t2)
 
 check_dur:
-      beqz   $t3, shut_down
+      beqz   $t3, check_op
       nop
       lw    $t6,  0($t1)
       ble   $t6,  $t3,  check_per
@@ -80,6 +83,31 @@ check_per:
       swr   $t6,  0($t5)
       j     check_dur
       nop
+      
+check_op:
+
+      xori  $t7,  $0,   OP_REPEAT
+      xor   $t7,  $t4,  $t7
+      andi  $t7,  $t7,  OP_MASK
+      beq   $t7,  $0,   do_repeat  
+      nop 
+      xori  $t7,  $0,   OP_STOP
+      xor   $t7,  $t4,  $t7
+      andi  $t7,  $t7,  OP_MASK
+      beq   $t7,  $0,   shut_down 
+      nop 
+      j     check_dur
+      nop
+      
+do_repeat:
+      addi  $t0,  $t0,  4
+      lw    $t0,  0($t0)
+      lhu   $t3,  2($t0)
+      lhu   $t4,  0($t0)
+      j     check_dur
+      nop
+      
+      
       
 shut_down:
 
@@ -122,23 +150,85 @@ finish:
 #define     N_GS      0x5E0 
 #define     REST      0x000     
 
-#define     TEMPO       0x82CA
+
 
 .macro  note freq=0, scale=3, part = 1
-.ifge     (\scale - 3)
-.HWORD  (\freq >> (\scale - 3))
-.else 
-.HWORD  (\freq << (3 - \scale))
-.endif
-.if     \part
-.HWORD  (TEMPO/\part)    
-.else
-.HWORD 0x0000
-.endif
+      .ifge     (\scale - 3)
+            .HWORD  (\freq >> (\scale - 3))
+      .else 
+            .HWORD  (\freq << (3 - \scale))
+      .endif
+      .if     \part
+            .HWORD  (TEMPO/\part)    
+      .else
+            .HWORD 0x0000
+      .endif
+.endm
+
+.macro  repeat_indef addr=req
+.HWORD OP_REPEAT, 0x0000
+.WORD  \addr
+.endm
+
+.macro  stop_play 
+.HWORD OP_STOP, 0x0000
 .endm
       
 	.section .rodata  # Store this information in FLASH instead of RAM
-_notes:
+	
+.set     TEMPO,       0x82CA
+
+_bday:
+      
+      note N_C,   3,    8
+      note REST,  3,    16
+      note N_C,   3,    16
+      
+      
+      note N_D,   3,    4
+      note N_C,   3,    4
+      note N_F,   3,    4
+      
+      
+      note N_E,   3,    2
+      note N_C,   3,    8
+      note REST,  3,    16
+      note N_C,   3,    16
+      
+      
+      note N_D,   3,    4
+      note N_C,   3,    4
+      note N_G,   3,    4
+      
+      note N_F,   3,    2
+      note N_C,   3,    8
+      note REST,  3,    16
+      note N_C,   3,    16
+      
+      
+      note N_C,   4,    4
+      note N_A,   4,    4
+      note N_F,   3,    4
+      
+      
+      note N_E,   3,    4
+      note N_D,   3,    4
+      note N_Bb,  4,    8
+      note REST,  4,    16
+      note N_Bb,  4,    16
+      
+      
+      note N_A,   4,    4
+      note N_F,   3,    4
+      note N_G,   3,    4
+      
+      note N_F,   3,    2
+      note N_F,   3,    4
+      stop_play
+      
+.set     TEMPO,       0x82CA
+      
+_bike:
       note N_D,   4,    4
       note N_D,   4,    8
       note N_C,   4,    4
@@ -158,6 +248,7 @@ _notes:
       note N_B,   4,    8
       note N_A,   4,    8
       
+_bike_loop:      
       note N_B,   4,    4
       note N_G,   3,    4
       note N_A,   4,    4
@@ -264,113 +355,9 @@ _notes:
       note N_G,   4,    8
       note N_FS,  4,    4
       
-      note N_B,   4,    4
-      note N_G,   3,    4
-      note N_A,   4,    4
-      note N_FS,  3,    4
+      repeat_indef      _bike_loop
       
-      note N_G,   3,    8
-      note N_FS,  3,    8
-      note N_E,   3,    8
-      note N_FS,  3,    8
-      note N_D,   3,    2
-      
-      
-      
-      note N_E,   3,    4
-      note N_G,   3,    4
-      note N_E,   3,    8
-      note N_B,   4,    8
-      note N_A,   4,    8
-      note N_G,   3,    8
-      
-      note N_FS,  3,    8
-      note N_G,   3,    8
-      note N_A,   4,    8
-      note N_G,   3,    8
-      note N_FS,  3,    2
-      
-      note N_B,   4,    4
-      note N_G,   3,    4
-      note N_A,   4,    4
-      note N_FS,  3,    4
-      
-      note N_G,   3,    8
-      note N_FS,  3,    8
-      note N_E,   3,    8
-      note N_FS,  3,    8
-      note N_D,   3,    2
-      
-      
-      
-      note N_E,   3,    4
-      note N_G,   3,    4
-      note N_E,   3,    8
-      note N_E,   4,    8
-      note N_D,   4,    8
-      note N_C,   4,    8
-      
-      note N_B,   4,    8
-      note N_C,   4,    8
-      note N_D,   4,    8
-      note N_E,   4,    8
-      note N_FS,  4,    2
-      
-      note N_G,   4,    4
-      note N_G,   4,    8
-      note N_B,   5,    4
-      note N_B,   5,    8
-      note N_G,   4,    4
-      
-      note N_FS,  4,    4
-      note N_FS,  4,    8
-      note N_A,   5,    4
-      note N_A,   5,    8
-      note N_FS,  4,    4
-      
-      
-      
-      note N_E,   4,    4
-      note N_E,   4,    8
-      note N_G,   4,    4
-      note N_G,   4,    8
-      note N_E,   4,    4
-      
-      note N_FS,  4,    4
-      note N_A,   5,    8
-      note N_D,   4,    8
-      note N_E,   4,    8
-      note N_F,   4,    8
-      note N_FS,  4,    4
-      
-      note N_G,   4,    4
-      note N_G,   4,    8
-      note N_B,   5,    4
-      note N_B,   5,    8
-      note N_G,   4,    4
-      
-      note N_FS,  4,    4
-      note N_FS,  4,    8
-      note N_A,   5,    4
-      note N_A,   5,    8
-      note N_FS,  4,    4
-      
-      
-      
-      note N_E,   4,    4
-      note N_E,   4,    8
-      note N_G,   4,    4
-      note N_G,   4,    8
-      note N_E,   4,    4
-      
-      note N_FS,  4,    4
-      note N_A,   5,    8
-      note N_B,   5,    8
-      note N_A,   5,    8
-      note N_G,   4,    8
-      note N_FS,  4,    4
-      
-#define     TEMPO       0x2625
+.set     TEMPO,       0x9896
 # G A B D E
 _tears:
       
@@ -457,8 +444,9 @@ _tears:
       note N_F,   4,    16
       note N_Bb,  5,    16
       note N_F,   4,    16
+      
 
-test:
+
       note N_Eb,  4,    8
       note N_Ab,  5,    16
       note N_F,   4,    8
@@ -555,10 +543,65 @@ test:
       note N_A,   5,    8
       note N_C,   5,    8
       
-      note REST,  3,    1
-      note REST,  3,    1
-      note REST,  3,    1
-      note REST,  3,    1
+      
+      note N_C,   4,    8
+      note N_C,   4,    16
+      note N_Bb,  4,    16
+      note N_Bb,  4,    8
+      note N_Bb,  5,    8
+      
+      note N_C,   4,    8
+      note N_C,   4,    16
+      note N_Bb,  4,    16
+      note N_Bb,  4,    8
+      note N_Bb,  5,    8
+      
+      
+      
+      note N_C,   4,    8
+      note N_C,   4,    16
+      note N_Bb,  4,    16
+      note N_Bb,  4,    8
+      note N_Bb,  5,    8
+      
+      note N_Db,  4,    16
+      note N_Db,  5,    16
+      note N_C,   4,    16
+      note N_C,   5,    16
+      
+      note N_Bb,  4,    16
+      note N_Bb,  5,    16
+      note N_Ab,  4,    16
+      note N_Ab,  5,    16
+      
+      
+      note N_C,   4,    8
+      note N_Bb,  4,    16
+      note N_Bb,  5,    16
+      note N_Bb,  5,    4
+      
+      note N_C,   4,    8
+      note N_Bb,  4,    16
+      note N_Bb,  5,    16
+      note N_Bb,  5,    4
+      
+      
+      note N_C,   4,    8
+      note N_Bb,  4,    16
+      note N_Bb,  5,    16
+      note N_Bb,  5,    4
+      
+      note N_Db,  5,    8
+      note N_Eb,  5,    8
+      note N_C,   5,    16
+      note N_Db,  5,    16
+      note N_Db,  5,    8
+      
+      repeat_indef      _tears
+      
+      
+fur_elise:
+      
       .HWORD 0x3b4, 0x989	# Data
       .HWORD 0x3ec, 0x989
       .HWORD 0x3b4, 0x989
