@@ -45,7 +45,4 @@ Icon
 !*.S
 !*.c
 !*.h
-<<<<<<< HEAD
 !*.txt
-=======
->>>>>>> parent of 9beed38... Changed gitignore
