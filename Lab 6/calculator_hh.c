@@ -46,7 +46,6 @@ int main(void){
     // setup and then parse indefinitely
     uart_setup();
     while (1) {
-        parseInput();
+        parse_input();
     }
-    return 0;
 }
