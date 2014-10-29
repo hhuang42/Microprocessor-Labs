@@ -45,3 +45,10 @@ Icon
 !*.S
 !*.c
 !*.h
+!*.txt
+!*.mcw
+!*.mcs
+!*.mcp
+!*.map
+!*.hex
+!*.elf
