@@ -9,7 +9,8 @@ module vga(input  logic       clk,
            output logic [7:0] led,
            output logic       vgaclk,						// 25 MHz VGA clock
            output logic       hsync, vsync, sync_b,	// to monitor & DAC
-           output logic [7:0] r, g, b);					// to video DAC
+           output logic [7:0] r, g, b,
+           output logic [35:0] test);					// to video DAC
  
   logic [9:0]  x, y;
   logic [7:0]  r_int, g_int, b_int;
@@ -42,6 +43,13 @@ module vga(input  logic       clk,
   assign led[2:0] = buttons;
   assign led[3] = finished;
   assign led[4] = spi_fsync;
+  assign led[5] = spi_fsync;
+  
+  
+  
+  byte_enabled_simple_dual_port_ram blah(x_cursor,led[5:0],led[3:0],y_cursor[8:0], 1, vsync, test);
+  
+  assign led[6] = &test;
 endmodule
 
 module vgaController #(parameter HMAX   = 10'd800,
@@ -199,6 +207,42 @@ module mouse_reader  (input  logic        sync_clk,
     {button_state, x_pixel, y_pixel} = complete_word;
   end
 endmodule
+
+module byte_enabled_simple_dual_port_ram
+  #(parameter int
+    ADDR_WIDTH = 10,
+    BYTE_WIDTH = 8,
+    BYTES = 6,
+      WIDTH = BYTES * BYTE_WIDTH
+)
+( 
+  input [ADDR_WIDTH-1:0] waddr,
+  input [ADDR_WIDTH-1:0] raddr,
+  input [BYTES-1:0] be,
+  input [BYTE_WIDTH-1:0] wdata, 
+  input we, clk,
+  output reg [WIDTH - 1:0] q
+);
+  localparam int WORDS = 1 << ADDR_WIDTH ;
+
+  // use a multi-dimensional packed array to model individual bytes within the word
+  logic [BYTES-1:0][BYTE_WIDTH-1:0] ram[0:WORDS-1];
+
+  always_ff@(posedge clk)
+  begin
+    if(we) begin
+    // edit this code if using other than four bytes per word
+      if(be[0]) ram[waddr][0] <= wdata;
+      if(be[1]) ram[waddr][1] <= wdata;
+      if(be[2]) ram[waddr][2] <= wdata;
+      if(be[3]) ram[waddr][3] <= wdata;
+      if(be[4]) ram[waddr][4] <= wdata;
+      if(be[5]) ram[waddr][5] <= wdata;
+  end
+    q <= ram[raddr];
+  end
+endmodule : byte_enabled_simple_dual_port_ram
+
   
 
 
